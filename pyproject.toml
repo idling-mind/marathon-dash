@@ -5,7 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "cardcanvas>=0.0.5",
+    "cardcanvas>=0.0.6",
     "dash-iconify>=0.1.2",
     "dash-mantine-components>=0.15.1",
     "gunicorn>=23.0.0",

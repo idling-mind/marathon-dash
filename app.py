@@ -348,6 +348,7 @@ canvas.card_manager.register_card_class(RacingCard)
 canvas.card_manager.register_card_class(HistogramCard)
 canvas.card_manager.register_card_class(ViolinCard)
 canvas.card_manager.register_card_class(HightlightCard)
+server = canvas.app.server
 
 if __name__ == "__main__":
     canvas.app.run_server(debug=True)

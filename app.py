@@ -43,15 +43,19 @@ class RacingCard(Card):
             range_x=[0, 27],
             template="mantine_light",
         )
-        fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
+        fig.update_layout(margin=dict(l=0, r=0, t=15, b=0))
         fig.update_traces(marker=dict(sizemin=5))
         return dmc.Card(
-            dcc.Graph(
-                figure=fig,
-                className="no-drag",
-                responsive=True,
-                style={"height": "100%"},
-            ),
+            [
+                dmc.Text("Racing chart", fz="30px", fw=600, c="blue"),
+                dmc.Text("Make different groups of people race", fw=600, c="dimmed"),
+                dcc.Graph(
+                    figure=fig,
+                    className="no-drag",
+                    responsive=True,
+                    style={"height": "100%"},
+                ),
+            ],
             style={"height": "100%"},
         )
 
@@ -83,21 +87,30 @@ class HistogramCard(Card):
     grid_settings = {"w": 4, "h": 2, "minW": 4, "minH": 2}
 
     def render(self):
+        column = self.settings.get("column", "overallTimeMinutes")
+        color = self.settings.get("color", None)
+        nbins = self.settings.get("bins", 20)
         figure = px.histogram(
             data,
-            x=self.settings.get("column", "overallTimeMinutes"),
-            color=self.settings.get("color", None),
-            nbins=self.settings.get("bins", 10),
+            x=column,
+            color=color,
+            nbins=nbins,
             template="mantine_light",
         )
-        figure.update_layout(margin=dict(l=0, r=0, t=0, b=0))
+        figure.update_layout(margin=dict(l=0, r=0, t=15, b=0))
         return dmc.Card(
-            dcc.Graph(
-                figure=figure,
-                className="no-drag",
-                responsive=True,
-                style={"height": "100%"},
-            ),
+            [
+                dmc.Text("Histogram", fz="30px", fw=600, c="blue"),
+                dmc.Text(
+                    f"Histogram of {column} coloured by {color}", fw=600, c="dimmed"
+                ),
+                dcc.Graph(
+                    figure=figure,
+                    className="no-drag",
+                    responsive=True,
+                    style={"height": "100%"},
+                ),
+            ],
             style={"height": "100%"},
         )
 
@@ -154,24 +167,34 @@ class ViolinCard(Card):
     grid_settings = {"w": 4, "h": 2, "minW": 4, "minH": 2}
 
     def render(self):
+        x = self.settings.get("x", "ageBand")
+        y = self.settings.get("y", "overallTimeMinutes")
         fig = px.violin(
             data,
-            x=self.settings.get("x", "ageBand"),
-            y=self.settings.get("y", "overallTimeMinutes"),
+            x=x,
+            y=y,
             template="mantine_light",
         )
-        fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
+        fig.update_layout(margin=dict(l=0, r=0, t=15, b=0))
         fig.update_xaxes(
             categoryorder="array",
-            categoryarray=data[self.settings.get("x", "ageBand")].unique(),
+            categoryarray=data[x].unique(),
         )
         return dmc.Card(
-            dcc.Graph(
-                figure=fig,
-                className="no-drag",
-                responsive=True,
-                style={"height": "100%"},
-            ),
+            [
+                dmc.Text("Violin plot", fz="30px", fw=600, c="blue"),
+                dmc.Text(
+                    f"Violin plot of {y} by {x}",
+                    fw=600,
+                    c="dimmed",
+                ),
+                dcc.Graph(
+                    figure=fig,
+                    className="no-drag",
+                    responsive=True,
+                    style={"height": "100%"},
+                ),
+            ],
             style={"height": "100%"},
         )
 
@@ -232,17 +255,6 @@ class HightlightCard(Card):
                 [
                     dmc.Group(
                         children=[
-                            dmc.ThemeIcon(
-                                DashIconify(icon=icon, width=50),
-                                size=50,
-                                variant="light",
-                            ),
-                            dmc.Text(highlight_value, fz="50px", fw=500, c="blue"),
-                        ],
-                        wrap="nowrap",
-                    ),
-                    dmc.Group(
-                        children=[
                             dmc.Text(
                                 suffix,
                                 c="dimmed",
@@ -250,7 +262,20 @@ class HightlightCard(Card):
                                 fw=400,
                             )
                         ],
-                        justify="flex-end",
+                        # justify="flex-end",
+                    ),
+                    dmc.Group(
+                        children=[
+                            dmc.Text(highlight_value, fz="40px", fw=600, c="blue"),
+                            dmc.ThemeIcon(
+                                DashIconify(icon=icon, width=50),
+                                size=50,
+                                radius="xl",
+                                variant="light",
+                            ),
+                        ],
+                        justify="space-between",
+                        wrap="nowrap",
                     ),
                 ],
                 style={"height": "100%", "background": "white"},
@@ -279,7 +304,7 @@ class HightlightCard(Card):
                         "id": self.id,
                         "sub-id": "column-filter",
                     },
-                    label="Column",
+                    label="Column Filter",
                     value=self.settings.get("column-filter", None),
                     searchable=True,
                     data=[

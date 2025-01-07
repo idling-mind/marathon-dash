@@ -238,7 +238,8 @@ class HightlightCard(Card):
                                 variant="light",
                             ),
                             dmc.Text(highlight_value, fz="50px", fw=500, c="blue"),
-                        ]
+                        ],
+                        wrap="nowrap",
                     ),
                     dmc.Group(
                         children=[
@@ -252,7 +253,7 @@ class HightlightCard(Card):
                         justify="flex-end",
                     ),
                 ],
-                style={"height": "100%"},
+                style={"height": "100%", "background": "white"},
             ),
         )
 

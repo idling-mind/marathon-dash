@@ -1,7 +1,7 @@
 from pathlib import Path
 import json
 from cardcanvas import CardCanvas, Card
-from dash import html, dcc, callback, Input, State, Output, MATCH
+from dash import html, dcc, callback, Input, State, Output, MATCH, callback_context, no_update
 import dash_mantine_components as dmc
 import plotly.express as px
 import pandas as pd
@@ -159,6 +159,177 @@ class HistogramCard(Card):
             ]
         )
 
+def generate_filter(column: pd.Series, input_id):
+    """Creating a filter based on the column type and it's unique values
+    Used in heatmap card to filter the data based on the column values
+    """
+    column = column.dropna()
+    card_id = input_id["id"]
+    filter_type = input_id["sub-id"]
+    if column.dtype in ["object", "string", "bool", "category"]:
+        sorted_unique = sorted(column.unique().tolist())
+        if len(sorted_unique) > 300:
+            return dmc.Text("Too many unique values to show filter", fz="14px", fw=600, c="red")
+        return [
+            dmc.Text("Filter", fz="14px", fw=600),
+            dmc.ScrollArea(
+                dmc.CheckboxGroup(
+                    id={"type": "card-settings", "id": card_id, "sub-id": f"{filter_type}-filter"},
+                    value=sorted_unique,
+                    children=dmc.Stack([dmc.Checkbox(label=x, value=x) for x in sorted_unique]),
+                ),
+                h=250,
+            ),
+        ]
+    return [
+        dmc.Text("Filter", fz="14px", fw=600),
+        dmc.RangeSlider(
+            id={"type": "card-settings", "id": card_id, "sub-id": f"{filter_type}-filter"},
+            value=[column.min(), column.max()],
+            min=column.min(),
+            max=column.max(),
+            minRange=(column.max() - column.min()) / 100,
+        ),
+    ]
+
+class HeatMap(Card):
+    title = "Heatmap"
+    description = "This card shows a heatmap of a given dataset"
+    icon = "mdi:file-document-edit"
+    grid_settings = {"w": 4, "h": 2, "minW": 4, "minH": 2}
+
+    def render(self):
+        x = self.settings.get("x", "minutesPerKM")
+        x_filter = self.settings.get("x-filter", None)
+        y = self.settings.get("y", "ageBand")
+        y_filter = self.settings.get("y-filter", None)
+        nbinsx = self.settings.get("nbinsx", 20)
+        nbinsy = self.settings.get("nbinsy", 20)
+        filtered_data = data.loc[:, [x, y]]
+        if x_filter is not None:
+            if filtered_data[x].dtype in ["object", "string", "bool", "category"]:
+                filtered_data = filtered_data[filtered_data[x].isin(x_filter)]
+            else:
+                filtered_data = filtered_data[
+                    (filtered_data[x] >= x_filter[0]) & (filtered_data[x] <= x_filter[1])
+                ]
+        if y_filter is not None:
+            if filtered_data[y].dtype in ["object", "string", "bool", "category"]:
+                filtered_data = filtered_data[filtered_data[y].isin(y_filter)]
+            else:
+                filtered_data = filtered_data[
+                    (filtered_data[y] >= y_filter[0]) & (filtered_data[y] <= y_filter[1])
+                ]
+        figure = px.density_heatmap(
+            filtered_data,
+            x=x,
+            y=y,
+            nbinsx=nbinsx,
+            nbinsy=nbinsy,
+            template="mantine_light",
+        )
+        figure.update_layout(margin=dict(l=0, r=0, t=15, b=0))
+        return dmc.Card(
+            [
+                dmc.Text("Heatmap", fz="30px", fw=600, c="blue"),
+                dmc.Text(f"Heatmap of {x} vs {y}", fw=600, c="dimmed"),
+                dcc.Graph(
+                    figure=figure,
+                    className="no-drag",
+                    responsive=True,
+                    style={"height": "100%"},
+                ),
+            ],
+            style={"height": "100%"},
+        )
+
+    def render_settings(self):
+        return dmc.Stack(
+            [
+                dmc.Select(
+                    id={
+                        "type": "card-settings",
+                        "id": self.id,
+                        "sub-id": "x",
+                    },
+                    label="X",
+                    value=self.settings.get("x", "minutesPerKM"),
+                    searchable=True,
+                    # numeric columns in data
+                    data=[
+                        {"label": column, "value": column} for column in data.columns
+                    ],
+                ),
+                html.Div(
+                    id={"type": "card-settings", "id": self.id, "container": "x-filter"},
+                    children=generate_filter(data[self.settings.get("x", "minutesPerKM")], {"type":"card-settings", "id": self.id, "sub-id": "x"})
+                ),
+                dmc.Select(
+                    id={
+                        "type": "card-settings",
+                        "id": self.id,
+                        "sub-id": "y",
+                    },
+                    label="Y",
+                    value=self.settings.get("y", "ageBand"),
+                    searchable=True,
+                    data=[{"label": i, "value": i} for i in data.columns],
+                ),
+                html.Div(
+                    id={"type": "card-settings", "id": self.id, "container": "y-filter"},
+                    children=generate_filter(data[self.settings.get("y", "ageBand")], {"type":"card-settings", "id": self.id, "sub-id": "y"})
+                ),
+                dmc.NumberInput(
+                    id={
+                        "type": "card-settings",
+                        "id": self.id,
+                        "sub-id": "nbinsx",
+                    },
+                    label="Number of bins in x direction",
+                    value=self.settings.get("nbinsx", 20),
+                    min=5,
+                ),
+                dmc.NumberInput(
+                    id={
+                        "type": "card-settings",
+                        "id": self.id,
+                        "sub-id": "nbinsy",
+                    },
+                    label="Number of bins in y direction",
+                    value=self.settings.get("nbinsy", 20),
+                    min=5,
+                ),
+            ]
+        )
+
+    @callback(
+        Output(
+            {"type": "card-settings", "id": MATCH, "container": "x-filter"}, "children"
+        ),
+        Input({"type": "card-settings", "id": MATCH, "sub-id": "x"}, "value"),
+    )
+    def update_filter_x(value):
+        """If the column is categorical, show a dropdown to filter the data
+        else if data is numeric, show a slider to filter the data"""
+        column = data[value]
+        # get the input id
+        ctx = callback_context
+        if not ctx.triggered_id:
+            return no_update
+        input_id = json.loads(ctx.triggered[0]["prop_id"].split(".")[0])
+        return generate_filter(column, input_id)
+
+    @callback(
+        Output({"type": "card-settings", "id": MATCH, "container": "y-filter"}, "children"),
+        Input({"type": "card-settings", "id": MATCH, "sub-id": "y"}, "value"),
+    )
+    def update_filter_y(value):
+        column = data[value]
+        ctx = callback_context
+        if not ctx.triggered_id:
+            return no_update
+        input_id = json.loads(ctx.triggered[0]["prop_id"].split(".")[0])
+        return generate_filter(column, input_id)
 
 class ViolinCard(Card):
     title = "Violin"
@@ -371,6 +542,7 @@ class HightlightCard(Card):
 canvas = CardCanvas(settings)
 canvas.card_manager.register_card_class(RacingCard)
 canvas.card_manager.register_card_class(HistogramCard)
+canvas.card_manager.register_card_class(HeatMap)
 canvas.card_manager.register_card_class(ViolinCard)
 canvas.card_manager.register_card_class(HightlightCard)
 server = canvas.app.server

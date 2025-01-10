@@ -1,7 +1,17 @@
 from pathlib import Path
 import json
 from cardcanvas import CardCanvas, Card
-from dash import html, dcc, callback, Input, State, Output, MATCH, callback_context, no_update
+from dash import (
+    html,
+    dcc,
+    callback,
+    Input,
+    State,
+    Output,
+    MATCH,
+    callback_context,
+    no_update,
+)
 import dash_mantine_components as dmc
 import plotly.express as px
 import pandas as pd
@@ -27,11 +37,19 @@ class RacingCard(Card):
     grid_settings = {"w": 4, "h": 2, "minW": 4, "minH": 2}
 
     def render(self):
-        data = position_data[
+        filtered_data = position_data.loc[
             position_data["name"].isin(self.settings.get("racers", ["Average Person"]))
         ]
+        # Find time where the slowest person reaches the end
+        # This has to be done since the original data contains position data for every
+        # group of people at every time step until the last person reaches the end
+        max_time = filtered_data.drop_duplicates(
+            subset=[str(col) for col in filtered_data.columns if col != "time"]
+        ).time.max()
+        filtered_data = filtered_data[filtered_data["time"] <= max_time]
+
         fig = px.scatter(
-            data,
+            filtered_data,
             x="position",
             y="name",
             animation_frame="time",
@@ -47,8 +65,17 @@ class RacingCard(Card):
         fig.update_traces(marker=dict(sizemin=5))
         return dmc.Card(
             [
-                dmc.Text("Racing chart", fz="30px", fw=600, c="blue"),
-                dmc.Text("Make different groups of people race", fw=600, c="dimmed"),
+                dmc.Text(
+                    self.settings.get("title", "Marathon chart"),
+                    fz="30px",
+                    fw=600,
+                    c="blue",
+                ),
+                dmc.Text(
+                    self.settings.get("description", "Groups of people racing"),
+                    fw=600,
+                    c="dimmed",
+                ),
                 dcc.Graph(
                     figure=fig,
                     className="no-drag",
@@ -75,7 +102,21 @@ class RacingCard(Card):
                         {"label": racer, "value": racer}
                         for racer in position_data["name"].unique()
                     ],
-                )
+                ),
+                dmc.TextInput(
+                    id={"type": "card-settings", "id": self.id, "sub-id": "title"},
+                    label="Title",
+                    value=self.settings.get("title", "Marathon chart"),
+                ),
+                dmc.TextInput(
+                    id={
+                        "type": "card-settings",
+                        "id": self.id,
+                        "sub-id": "description",
+                    },
+                    label="Description",
+                    value=self.settings.get("description", "Groups of people racing"),
+                ),
             ]
         )
 
@@ -100,9 +141,15 @@ class HistogramCard(Card):
         figure.update_layout(margin=dict(l=0, r=0, t=15, b=0))
         return dmc.Card(
             [
-                dmc.Text("Histogram", fz="30px", fw=600, c="blue"),
                 dmc.Text(
-                    f"Histogram of {column} coloured by {color}", fw=600, c="dimmed"
+                    self.settings.get("title", "Histogram"), fz="30px", fw=600, c="blue"
+                ),
+                dmc.Text(
+                    self.settings.get(
+                        "description", f"Histogram of {column} coloured by {color}"
+                    ),
+                    fw=600,
+                    c="dimmed",
                 ),
                 dcc.Graph(
                     figure=figure,
@@ -156,10 +203,25 @@ class HistogramCard(Card):
                     value=self.settings.get("bins", 20),
                     min=1,
                 ),
+                dmc.TextInput(
+                    id={"type": "card-settings", "id": self.id, "sub-id": "title"},
+                    label="Title",
+                    value=self.settings.get("title", "Histogram"),
+                ),
+                dmc.TextInput(
+                    id={
+                        "type": "card-settings",
+                        "id": self.id,
+                        "sub-id": "description",
+                    },
+                    label="Description",
+                    value=self.settings.get("description", f"Histogram description"),
+                ),
             ]
         )
 
-def generate_filter(column: pd.Series, input_id):
+
+def generate_filter(column: pd.Series, input_id, default_value=None):
     """Creating a filter based on the column type and it's unique values
     Used in heatmap card to filter the data based on the column values
     """
@@ -169,14 +231,22 @@ def generate_filter(column: pd.Series, input_id):
     if column.dtype in ["object", "string", "bool", "category"]:
         sorted_unique = sorted(column.unique().tolist())
         if len(sorted_unique) > 300:
-            return dmc.Text("Too many unique values to show filter", fz="14px", fw=600, c="red")
+            return dmc.Text(
+                "Too many unique values to show filter", fz="14px", fw=600, c="red"
+            )
         return [
             dmc.Text("Filter", fz="14px", fw=600),
             dmc.ScrollArea(
                 dmc.CheckboxGroup(
-                    id={"type": "card-settings", "id": card_id, "sub-id": f"{filter_type}-filter"},
-                    value=sorted_unique,
-                    children=dmc.Stack([dmc.Checkbox(label=x, value=x) for x in sorted_unique]),
+                    id={
+                        "type": "card-settings",
+                        "id": card_id,
+                        "sub-id": f"{filter_type}-filter",
+                    },
+                    value=default_value or sorted_unique,
+                    children=dmc.Stack(
+                        [dmc.Checkbox(label=x, value=x) for x in sorted_unique]
+                    ),
                 ),
                 h=250,
             ),
@@ -184,13 +254,18 @@ def generate_filter(column: pd.Series, input_id):
     return [
         dmc.Text("Filter", fz="14px", fw=600),
         dmc.RangeSlider(
-            id={"type": "card-settings", "id": card_id, "sub-id": f"{filter_type}-filter"},
-            value=[column.min(), column.max()],
+            id={
+                "type": "card-settings",
+                "id": card_id,
+                "sub-id": f"{filter_type}-filter",
+            },
+            value=default_value or [column.min(), column.max()],
             min=column.min(),
             max=column.max(),
             minRange=(column.max() - column.min()) / 100,
         ),
     ]
+
 
 class HeatMap(Card):
     title = "Heatmap"
@@ -211,14 +286,16 @@ class HeatMap(Card):
                 filtered_data = filtered_data[filtered_data[x].isin(x_filter)]
             else:
                 filtered_data = filtered_data[
-                    (filtered_data[x] >= x_filter[0]) & (filtered_data[x] <= x_filter[1])
+                    (filtered_data[x] >= x_filter[0])
+                    & (filtered_data[x] <= x_filter[1])
                 ]
         if y_filter is not None:
             if filtered_data[y].dtype in ["object", "string", "bool", "category"]:
                 filtered_data = filtered_data[filtered_data[y].isin(y_filter)]
             else:
                 filtered_data = filtered_data[
-                    (filtered_data[y] >= y_filter[0]) & (filtered_data[y] <= y_filter[1])
+                    (filtered_data[y] >= y_filter[0])
+                    & (filtered_data[y] <= y_filter[1])
                 ]
         figure = px.density_heatmap(
             filtered_data,
@@ -231,8 +308,14 @@ class HeatMap(Card):
         figure.update_layout(margin=dict(l=0, r=0, t=15, b=0))
         return dmc.Card(
             [
-                dmc.Text("Heatmap", fz="30px", fw=600, c="blue"),
-                dmc.Text(f"Heatmap of {x} vs {y}", fw=600, c="dimmed"),
+                dmc.Text(
+                    self.settings.get("title", "Heatmap"), fz="30px", fw=600, c="blue"
+                ),
+                dmc.Text(
+                    self.settings.get("description", f"Heatmap of {x} vs {y}"),
+                    fw=600,
+                    c="dimmed",
+                ),
                 dcc.Graph(
                     figure=figure,
                     className="no-drag",
@@ -261,8 +344,16 @@ class HeatMap(Card):
                     ],
                 ),
                 html.Div(
-                    id={"type": "card-settings", "id": self.id, "container": "x-filter"},
-                    children=generate_filter(data[self.settings.get("x", "minutesPerKM")], {"type":"card-settings", "id": self.id, "sub-id": "x"})
+                    id={
+                        "type": "card-settings",
+                        "id": self.id,
+                        "container": "x-filter",
+                    },
+                    children=generate_filter(
+                        data[self.settings.get("x", "minutesPerKM")],
+                        {"type": "card-settings", "id": self.id, "sub-id": "x"},
+                        default_value=self.settings.get("x-filter", None),
+                    ),
                 ),
                 dmc.Select(
                     id={
@@ -276,8 +367,16 @@ class HeatMap(Card):
                     data=[{"label": i, "value": i} for i in data.columns],
                 ),
                 html.Div(
-                    id={"type": "card-settings", "id": self.id, "container": "y-filter"},
-                    children=generate_filter(data[self.settings.get("y", "ageBand")], {"type":"card-settings", "id": self.id, "sub-id": "y"})
+                    id={
+                        "type": "card-settings",
+                        "id": self.id,
+                        "container": "y-filter",
+                    },
+                    children=generate_filter(
+                        data[self.settings.get("y", "ageBand")],
+                        {"type": "card-settings", "id": self.id, "sub-id": "y"},
+                        default_value=self.settings.get("y-filter", None),
+                    ),
                 ),
                 dmc.NumberInput(
                     id={
@@ -298,6 +397,20 @@ class HeatMap(Card):
                     label="Number of bins in y direction",
                     value=self.settings.get("nbinsy", 20),
                     min=5,
+                ),
+                dmc.TextInput(
+                    id={"type": "card-settings", "id": self.id, "sub-id": "title"},
+                    label="Title",
+                    value=self.settings.get("title", "Heatmap"),
+                ),
+                dmc.TextInput(
+                    id={
+                        "type": "card-settings",
+                        "id": self.id,
+                        "sub-id": "description",
+                    },
+                    label="Description",
+                    value=self.settings.get("description", f"Heatmap description"),
                 ),
             ]
         )
@@ -320,7 +433,9 @@ class HeatMap(Card):
         return generate_filter(column, input_id)
 
     @callback(
-        Output({"type": "card-settings", "id": MATCH, "container": "y-filter"}, "children"),
+        Output(
+            {"type": "card-settings", "id": MATCH, "container": "y-filter"}, "children"
+        ),
         Input({"type": "card-settings", "id": MATCH, "sub-id": "y"}, "value"),
     )
     def update_filter_y(value):
@@ -330,6 +445,7 @@ class HeatMap(Card):
             return no_update
         input_id = json.loads(ctx.triggered[0]["prop_id"].split(".")[0])
         return generate_filter(column, input_id)
+
 
 class ViolinCard(Card):
     title = "Violin"
@@ -353,9 +469,14 @@ class ViolinCard(Card):
         )
         return dmc.Card(
             [
-                dmc.Text("Violin plot", fz="30px", fw=600, c="blue"),
                 dmc.Text(
-                    f"Violin plot of {y} by {x}",
+                    self.settings.get("title", "Violin plot"),
+                    fz="30px",
+                    fw=600,
+                    c="blue",
+                ),
+                dmc.Text(
+                    self.settings.get("description", f"Violin plot of {y} by {x}"),
                     fw=600,
                     c="dimmed",
                 ),
@@ -399,6 +520,20 @@ class ViolinCard(Card):
                         {"label": column, "value": column}
                         for column in data.select_dtypes(include="number").columns
                     ],
+                ),
+                dmc.TextInput(
+                    id={"type": "card-settings", "id": self.id, "sub-id": "title"},
+                    label="Title",
+                    value=self.settings.get("title", "Violin plot"),
+                ),
+                dmc.TextInput(
+                    id={
+                        "type": "card-settings",
+                        "id": self.id,
+                        "sub-id": "description",
+                    },
+                    label="Description",
+                    value=self.settings.get("description", f"Violin plot description"),
                 ),
             ]
         )

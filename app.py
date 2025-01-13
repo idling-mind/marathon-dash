@@ -224,7 +224,7 @@ class HistogramCard(Card):
                         "sub-id": "description",
                     },
                     label="Description",
-                    value=self.settings.get("description", f"Histogram description"),
+                    value=self.settings.get("description", "Histogram description"),
                 ),
             ]
         )
@@ -422,7 +422,7 @@ class HeatMap(Card):
                         "sub-id": "description",
                     },
                     label="Description",
-                    value=self.settings.get("description", f"Heatmap description"),
+                    value=self.settings.get("description", "Heatmap description"),
                 ),
             ]
         )
@@ -548,7 +548,7 @@ class ViolinCard(Card):
                         "sub-id": "description",
                     },
                     label="Description",
-                    value=self.settings.get("description", f"Violin plot description"),
+                    value=self.settings.get("description", "Violin plot description"),
                 ),
             ]
         )

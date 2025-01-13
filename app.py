@@ -88,6 +88,8 @@ class RacingCard(Card):
                 ),
             ],
             style={"height": "100%"},
+            withBorder=True,
+            shadow="xs",
         )
 
     def render_settings(self):
@@ -164,6 +166,8 @@ class HistogramCard(Card):
                 ),
             ],
             style={"height": "100%"},
+            withBorder=True,
+            shadow="xs",
         )
 
     def render_settings(self):
@@ -330,6 +334,8 @@ class HeatMap(Card):
                 ),
             ],
             style={"height": "100%"},
+            withBorder=True,
+            shadow="xs",
         )
 
     def render_settings(self):
@@ -495,6 +501,8 @@ class ViolinCard(Card):
                 ),
             ],
             style={"height": "100%"},
+            withBorder=True,
+            shadow="xs",
         )
 
     def render_settings(self):
@@ -592,6 +600,8 @@ class HightlightCard(Card):
                     ),
                 ],
                 style={"height": "100%"},
+                withBorder=True,
+                shadow="xs",
             ),
         )
 

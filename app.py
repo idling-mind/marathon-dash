@@ -9,11 +9,14 @@ from dash import (
     State,
     Output,
     MATCH,
+    ALL,
+    Patch,
     callback_context,
     no_update,
 )
 import dash_mantine_components as dmc
 import plotly.express as px
+import plotly.io as pio
 import pandas as pd
 from dash_iconify import DashIconify
 
@@ -45,7 +48,7 @@ class RacingCard(Card):
         # group of people at every time step until the last person reaches the end
         max_time = filtered_data.drop_duplicates(
             subset=[str(col) for col in filtered_data.columns if col != "time"]
-        ).time.max()
+        ).time.max() # type: ignore
         filtered_data = filtered_data[filtered_data["time"] <= max_time]
 
         fig = px.scatter(
@@ -78,6 +81,7 @@ class RacingCard(Card):
                 ),
                 dcc.Graph(
                     figure=fig,
+                    id={"type": "card-control", "sub-type": "figure", "id": self.id},
                     className="no-drag",
                     responsive=True,
                     style={"height": "100%"},
@@ -153,6 +157,7 @@ class HistogramCard(Card):
                 ),
                 dcc.Graph(
                     figure=figure,
+                    id={"type": "card-control", "sub-type": "figure", "id": self.id},
                     className="no-drag",
                     responsive=True,
                     style={"height": "100%"},
@@ -318,6 +323,7 @@ class HeatMap(Card):
                 ),
                 dcc.Graph(
                     figure=figure,
+                    id={"type": "card-control", "sub-type": "figure", "id": self.id},
                     className="no-drag",
                     responsive=True,
                     style={"height": "100%"},
@@ -482,6 +488,7 @@ class ViolinCard(Card):
                 ),
                 dcc.Graph(
                     figure=fig,
+                    id={"type": "card-control", "sub-type": "figure", "id": self.id},
                     className="no-drag",
                     responsive=True,
                     style={"height": "100%"},
@@ -584,7 +591,7 @@ class HightlightCard(Card):
                         wrap="nowrap",
                     ),
                 ],
-                style={"height": "100%", "background": "white"},
+                style={"height": "100%"},
             ),
         )
 
@@ -672,6 +679,20 @@ class HightlightCard(Card):
         return [
             {"label": str(item), "value": str(item)} for item in data[column].unique()
         ]
+
+@callback(
+    Output({"type": "card-control", "sub-type": "figure", "id": ALL}, "figure"),
+    Input("mantine-provider", "forceColorScheme"),
+    State({"type": "card-control", "sub-type": "figure", "id": ALL}, "id"),
+)
+def update_color_scheme(color_scheme, figure_ids):
+    template = pio.templates["mantine_light"] if color_scheme == "light" else pio.templates["mantine_dark"]
+    patched_figures = []
+    for _ in figure_ids:
+        patched_figure = Patch()
+        patched_figure["layout"]["template"] = template
+        patched_figures.append(patched_figure)
+    return patched_figures
 
 
 canvas = CardCanvas(settings)
